@@ -1,0 +1,42 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  regression:
+    name: ${{ matrix.os }} / py${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.9', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      # Rebuilds both reference cases: model.py -> .lsp -> check_lsp (parens, lint,
+      # full LISP simulation) -> dimension text check -> overlay coverage thresholds.
+      # Exit code 0 only when every gate passes.
+      - name: Regression suite
+        run: python tests/run_tests.py
+
+      - name: Upload overlay and coverage on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-${{ matrix.os }}-py${{ matrix.python }}
+          path: tests/*/out/check/
+          if-no-files-found: ignore

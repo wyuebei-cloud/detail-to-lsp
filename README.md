@@ -1,5 +1,7 @@
 # detail-to-lsp
 
+[![tests](https://github.com/wyuebei-cloud/detail-to-lsp/actions/workflows/tests.yml/badge.svg)](https://github.com/wyuebei-cloud/detail-to-lsp/actions/workflows/tests.yml)
+
 Rebuild an engineering/CAD detail shown in a PDF sheet or a screenshot as a single
 AutoLISP file that draws it 1:1 in model space - geometry, text, leaders, symbols and
 real DIMENSION objects on separate layers.
