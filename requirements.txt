@@ -4,8 +4,9 @@
 # is standard library only. The packages below are needed for intake and for the
 # overlay used in Phase 4. All of them ship as wheels; no compiler required.
 
-pdfplumber     # probe.py, pdf_extract.py - vector PDF intake
-numpy          # raster_measure.py, overlay.py, detail_model.fit_circle
-Pillow         # raster_measure.py, overlay.py - raster intake and overlay rendering
-scipy          # overlay.py only (ndimage labelling). Phase 4 cannot be completed
-               # without it, so treat it as required rather than optional.
+pdfplumber>=0.11.0 # probe.py, pdf_extract.py - 0.10.x lacks curve "path" data and its
+                   # page.to_image breaks against current pypdfium2 (checked)
+numpy              # raster_measure.py, overlay.py, detail_model.fit_circle
+Pillow             # raster_measure.py, overlay.py - raster intake and overlay rendering
+scipy              # overlay.py only (ndimage labelling). Phase 4 cannot be completed
+                   # without it, so treat it as required rather than optional.
