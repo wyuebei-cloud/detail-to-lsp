@@ -30,10 +30,24 @@ for name, lsp, cmd, extra, max_u, max_s in CASES:
     gate = 'PASS' if rc == 0 else 'FAIL'
     print(f'   gate (parens/lint/simulation): {gate}')
     if rc: print(out[-2500:]); ok_all = False
+    # The gate must report a record count, and every record must have been drawn.
+    mrec = re.search(r'(\d+) records OK,\s+(\d+) failed', out)
+    if not mrec:
+        print('   records: NOT REPORTED in gate output -> FAIL')
+        ok_all = False
+    else:
+        print(f'   records drawn: {mrec.group(1)} OK, {mrec.group(2)} failed')
+        if int(mrec.group(2)):
+            ok_all = False
     rep = open(os.path.join(cwd, lsp.replace('.lsp', '.report.md'))).read()
-    mm = int(re.search(r'mismatches: (\d+)', rep).group(1)) if 'mismatches' in rep else 0
-    print(f'   dimension text mismatches: {mm}')
-    if mm: ok_all = False
+    # "mismatches: N" missing means the dimension check never ran - absence is not a pass.
+    if 'mismatches' not in rep:
+        print('   dimension text mismatches: report has no dimension check -> FAIL')
+        mm = -1
+    else:
+        mm = int(re.search(r'mismatches: (\d+)', rep).group(1))
+        print(f'   dimension text mismatches: {mm}')
+        if mm: ok_all = False
     rc, out = run([sys.executable, os.path.join(S, 'overlay.py'), lsp, '--out', 'out/check'] + extra, cwd)
     if rc: print(out[-2500:]); ok_all = False; continue
     m = re.search(r'OUTSIDE TEXT ZONES.*?unclaimed by model :\s+([\d.]+) %.*?no source ink  :\s+([\d.]+) %', out, re.S)

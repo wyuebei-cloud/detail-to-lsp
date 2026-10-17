@@ -105,6 +105,17 @@ def main():
         it = lisp_sim.simulate(src, a.run, is_src=True)
         print('\nSIMULATION (' + a.run + '):')
         print(lisp_sim.summary(it))
+        # The runtime reports how many records it drew and how many it could not.
+        # A record it could not draw is a failure of the emitted data, so the gate
+        # requires the count to end at 0 - warnings alone (a linetype that would not
+        # load, a dimension the host rejected) stay non-fatal by design.
+        spoken = ' '.join(str(x) for x in it.out if isinstance(x, str))
+        m = re.search(r'(\d+) records OK,\s+(\d+) failed', spoken)
+        if not m:
+            it.acad.errors.append('runtime did not report a record count - the command did not complete')
+        elif int(m.group(2)):
+            first = next((str(x).strip() for x in it.out if isinstance(x, str) and 'Record failed' in x), '')
+            it.acad.errors.append(f'{m.group(2)} record(s) failed at runtime, gate requires 0. {first}')
         if a.json:
             json.dump({'entities': lisp_sim.entities_plain(it), 'tables': {k: list(v) for k, v in it.acad.tables.items()},
                        'errors': it.acad.errors, 'warnings': it.acad.warnings}, open(a.json, 'w'), indent=1)

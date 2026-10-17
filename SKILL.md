@@ -108,7 +108,8 @@ python scripts/overlay.py out/UB-NAME.lsp --out out/check --tiles 3x2 [--roi=..]
 - `check_lsp` = paren balance with per-line depth on failure, lint, then the whole file
   is executed in `lisp_sim.py` (AutoLISP subset + AutoCAD stub). Every `entmake` is
   validated against DXF group-code rules; unknown functions, arity errors, missing
-  styles/linetypes and bad setvar calls fail the gate.
+  styles/linetypes and bad setvar calls fail the gate, and the runtime's own record
+  count must end at `0 failed`.
 - `overlay.png` draws the **simulated entities**, so it shows the script itself.
   Inspect every junction of two members, every leader end and every dimension.
 - `coverage.txt`: the "OUTSIDE TEXT ZONES" numbers are the geometry signal; drive

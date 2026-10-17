@@ -34,7 +34,10 @@
 Reader/paren errors, unknown functions, wrong argument counts, protected symbols (T, PI)
 as locals, setvar names and value types, entmake group-code types and per-entity
 required codes, missing text styles / linetypes / dimstyles referenced by entities,
-LWPOLYLINE/LEADER vertex counts, every record's success, and the drawn result (overlay).
+LWPOLYLINE/LEADER vertex counts, and the drawn result (overlay). Every record must be
+drawn: the runtime closes with "<n> records OK, <m> failed" and the gate fails unless
+m = 0. Warnings stay non-fatal by design - a linetype that would not load, or a single
+dimension the host rejected, is reported and the rest of the drawing still completes.
 
 ## Not verifiable outside AutoCAD (first things to check if a run fails)
 - Whether `entmake` of a LEADER without annotation is accepted by the specific product

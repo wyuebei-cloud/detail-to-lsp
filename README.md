@@ -53,7 +53,9 @@ and what cannot be verified outside AutoCAD.
 - `check_lsp.py` is the delivery gate. It balances parentheses, lints, then executes the
   whole file in `lisp_sim.py` (an AutoLISP subset against an AutoCAD stub). Every
   `entmake` is validated against DXF group-code rules, so unknown functions, arity
-  errors, missing text styles or linetypes and bad `setvar` calls fail before delivery.
+  errors, missing text styles or linetypes and bad `setvar` calls fail before delivery,
+  and the runtime must close at "N records OK, 0 failed" - a record it could not draw
+  fails the gate even when nothing raised.
 - `overlay.py` draws the **simulated** entities on top of the source and reports coverage
   in both directions. The number to drive to zero is unclaimed source ink outside text
   zones.
