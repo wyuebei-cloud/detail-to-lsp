@@ -108,6 +108,11 @@ dimension text and the coverage thresholds. Current result on Windows / Python 3
 `tests/traffic_barrier/source.pdf` is WSDOT 10.2-A6-1b. Both are public agency standard
 plans, included as visual baselines for the regression tests.
 
+CI runs the same suite on ubuntu-latest and windows-latest with Python 3.9 and 3.12.
+Measured coverage moves by a few tenths of a percent between platforms (ubuntu py3.9:
+5.97 % / 5.65 % unclaimed, 0.33 % / 2.68 % spurious); the thresholds are not
+platform-specific and are not relaxed per leg.
+
 ## License
 
 MIT, see `LICENSE`. The bundled fonts in `assets/fonts/` are Liberation Sans under the
