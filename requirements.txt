@@ -1,0 +1,11 @@
+# detail-to-lsp - Python dependencies
+#
+# Core chain (scripts/detail_model.py -> emit_lsp.py -> check_lsp.py -> lisp_sim.py)
+# is standard library only. The packages below are needed for intake and for the
+# overlay used in Phase 4. All of them ship as wheels; no compiler required.
+
+pdfplumber     # probe.py, pdf_extract.py - vector PDF intake
+numpy          # raster_measure.py, overlay.py, detail_model.fit_circle
+Pillow         # raster_measure.py, overlay.py - raster intake and overlay rendering
+scipy          # overlay.py only (ndimage labelling). Phase 4 cannot be completed
+               # without it, so treat it as required rather than optional.
