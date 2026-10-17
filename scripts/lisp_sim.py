@@ -891,6 +891,12 @@ def summary(it):
 
 
 if __name__ == '__main__':
+    # A pipe on Windows uses the ANSI code page (cp1252); drawing text can contain
+    # characters it cannot encode (private-use symbol glyphs, U+2248). Escape them
+    # instead of crashing, so the tools behave the same on every platform.
+    for _s in (sys.stdout, sys.stderr):
+        if hasattr(_s, 'reconfigure'):
+            _s.reconfigure(errors='backslashreplace')
     import argparse
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('lsp'); ap.add_argument('command', help='e.g. C:UB-CBGUTTERPAN')

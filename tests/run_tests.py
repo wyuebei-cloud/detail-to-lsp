@@ -39,11 +39,11 @@ for name, lsp, cmd, extra, max_u, max_s in CASES:
         print(f'   records drawn: {mrec.group(1)} OK, {mrec.group(2)} failed')
         if int(mrec.group(2)):
             ok_all = False
-    rep = open(os.path.join(cwd, lsp.replace('.lsp', '.report.md'))).read()
+    rep = open(os.path.join(cwd, lsp.replace('.lsp', '.report.md')), encoding='utf-8').read()
     # "mismatches: N" missing means the dimension check never ran - absence is not a pass.
     if 'mismatches' not in rep:
         print('   dimension text mismatches: report has no dimension check -> FAIL')
-        mm = -1
+        ok_all = False
     else:
         mm = int(re.search(r'mismatches: (\d+)', rep).group(1))
         print(f'   dimension text mismatches: {mm}')
@@ -56,5 +56,30 @@ for name, lsp, cmd, extra, max_u, max_s in CASES:
     print(f'   coverage outside text zones: unclaimed {u:.2f}% (max {max_u}), spurious {s:.2f}% (max {max_s}) '
           f'-> {"OK" if good else "FAIL"}')
     ok_all &= good
+# ---------------------------------------------------------------- intake CLI smoke test
+# The reference cases above never print source text, so they cannot catch an intake tool
+# that crashes on output. Run every CLI once with the child's stdout forced to cp1252 -
+# the encoding a Windows pipe uses - so a character it cannot encode fails here on any OS.
+print('== intake CLI smoke (stdout encoding cp1252)')
+GP, TB = os.path.join(HERE, 'gutter_pan'), os.path.join(HERE, 'traffic_barrier')
+SMOKE = [
+    ('probe pdf', [os.path.join(S, 'probe.py'), os.path.join(TB, 'source.pdf')]),
+    ('probe image', [os.path.join(S, 'probe.py'), os.path.join(GP, 'source.png')]),
+    ('pdf_extract', [os.path.join(S, 'pdf_extract.py'), os.path.join(TB, 'source.pdf'),
+                     '--bbox', '697,409,1016,700', '--arcs']),
+    ('raster_measure', [os.path.join(S, 'raster_measure.py'), 'lines', os.path.join(GP, 'source.png'),
+                        '770', '545', '1150', '595']),
+    ('calibrate', [os.path.join(S, 'calibrate.py'), '1243=156.25', '483=60.727', '274=34.5', '143=18',
+                   '--axis', 'x,x,y,y']),
+]
+env = dict(os.environ, PYTHONIOENCODING='cp1252')
+for label, args in SMOKE:
+    r = subprocess.run([sys.executable] + args, cwd=HERE, capture_output=True, env=env)
+    good = r.returncode == 0
+    print(f'   {label:<15} {"OK" if good else "FAIL"}')
+    if not good:
+        print(r.stderr.decode('cp1252', 'replace')[-1500:])
+        ok_all = False
+
 print('\nALL PASS' if ok_all else '\nSOME TESTS FAILED')
 sys.exit(0 if ok_all else 1)
