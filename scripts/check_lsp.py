@@ -105,17 +105,24 @@ def main():
         it = lisp_sim.simulate(src, a.run, is_src=True)
         print('\nSIMULATION (' + a.run + '):')
         print(lisp_sim.summary(it))
-        # The runtime reports how many records it drew and how many it could not.
-        # A record it could not draw is a failure of the emitted data, so the gate
-        # requires the count to end at 0 - warnings alone (a linetype that would not
-        # load, a dimension the host rejected) stay non-fatal by design.
-        spoken = ' '.join(str(x) for x in it.out if isinstance(x, str))
-        m = re.search(r'(\d+) records OK,\s+(\d+) failed', spoken)
-        if not m:
-            it.acad.errors.append('runtime did not report a record count - the command did not complete')
-        elif int(m.group(2)):
-            first = next((str(x).strip() for x in it.out if isinstance(x, str) and 'Record failed' in x), '')
-            it.acad.errors.append(f'{m.group(2)} record(s) failed at runtime, gate requires 0. {first}')
+        # Files built on the detail-to-lsp runtime report how many records they drew and
+        # how many they could not. A record the runtime could not draw is a defect in the
+        # emitted data, so for those files the gate requires the count to end at 0.
+        # Hand-written files have no such report and are judged by errors alone.
+        # Runtime warnings (a linetype that would not load, a leader drawn as a polyline)
+        # stay non-fatal.
+        gate_errs = []
+        if it.lookup(lisp_sim.Sym('DTL:RUN')) is not None:
+            spoken = ' '.join(str(x) for x in it.out if isinstance(x, str))
+            m = re.search(r'(\d+) records OK,\s+(\d+) failed', spoken)
+            if not m:
+                gate_errs.append('runtime did not report a record count - the command did not complete')
+            elif int(m.group(2)):
+                first = next((str(x).strip() for x in it.out if isinstance(x, str) and 'Record failed' in x), '')
+                gate_errs.append(f'{m.group(2)} record(s) failed at runtime, gate requires 0. {first}'.strip())
+        for e in gate_errs:
+            print('  GATE  ' + e)
+        it.acad.errors.extend(gate_errs)
         if a.json:
             json.dump({'entities': lisp_sim.entities_plain(it), 'tables': {k: list(v) for k, v in it.acad.tables.items()},
                        'errors': it.acad.errors, 'warnings': it.acad.warnings}, open(a.json, 'w'), indent=1)
@@ -124,4 +131,10 @@ def main():
     sys.exit(rc)
 
 if __name__ == '__main__':
+    # A pipe on Windows uses the ANSI code page (cp1252); drawing text can contain
+    # characters it cannot encode (private-use symbol glyphs, U+2248). Escape them
+    # instead of crashing, so the tools behave the same on every platform.
+    for _s in (sys.stdout, sys.stderr):
+        if hasattr(_s, 'reconfigure'):
+            _s.reconfigure(errors='backslashreplace')
     main()

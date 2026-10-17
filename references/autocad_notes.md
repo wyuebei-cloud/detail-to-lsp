@@ -34,10 +34,16 @@
 Reader/paren errors, unknown functions, wrong argument counts, protected symbols (T, PI)
 as locals, setvar names and value types, entmake group-code types and per-entity
 required codes, missing text styles / linetypes / dimstyles referenced by entities,
-LWPOLYLINE/LEADER vertex counts, and the drawn result (overlay). Every record must be
-drawn: the runtime closes with "<n> records OK, <m> failed" and the gate fails unless
-m = 0. Warnings stay non-fatal by design - a linetype that would not load, or a single
-dimension the host rejected, is reported and the rest of the drawing still completes.
+LWPOLYLINE/LEADER vertex counts, and the drawn result (overlay). For files built on
+this runtime every record must be drawn in the simulation: the runtime closes with
+"<n> records OK, <m> failed" and the gate fails unless m = 0. A failed record in the
+simulator means the emitted data is wrong (unknown record type, bad values), so it is
+never tolerated there. Simulator warnings (a linetype that would not load, a leader
+drawn as a polyline) stay non-fatal. Hand-written .lsp files have no record report and
+are judged by simulator errors alone.
+
+Inside AutoCAD the same report is informational: a record the host rejects (for example
+one dimension refused by ActiveX) is listed and the rest of the drawing still completes.
 
 ## Not verifiable outside AutoCAD (first things to check if a run fails)
 - Whether `entmake` of a LEADER without annotation is accepted by the specific product
