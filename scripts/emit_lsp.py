@@ -88,6 +88,10 @@ def rec_to_lisp(r):
             lstr(r[8]) if r[8] else 'nil', lreal(r[9]) if r[9] is not None else 'nil')
     if k == 'SOLID':
         return '("SOLID" %s %s %s %s %s)' % (lstr(r[1]), pt(r[2]), pt(r[3]), pt(r[4]), pt(r[5]))
+    if k == 'HATCH':
+        loops = ' '.join('(' + ' '.join('(%s %s %s)' % (lreal(x), lreal(y), lreal(b)) for x, y, b in lp) + ')'
+                         for lp in r[5])
+        return '("HATCH" %s %s %s %s (%s))' % (lstr(r[1]), lstr(r[2]), lreal(r[3]), lreal(r[4]), loops)
     raise ValueError('unknown record ' + k)
 
 def header(d):

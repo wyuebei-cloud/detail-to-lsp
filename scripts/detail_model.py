@@ -245,6 +245,7 @@ DEFAULT_LAYERS = {
     'DTL-GEOM-DOT':    (8, 13, 'DOT'),
     'DTL-GEOM-HIDDEN': (8, 18, 'HIDDEN'),
     'DTL-GEOM-CENTER': (8, 13, 'CENTER'),
+    'DTL-HATCH':       (8, 9, 'Continuous'),
     'DTL-TEXT':        (2, 25, 'Continuous'),
     'DTL-DIM':         (4, 18, 'Continuous'),
 }
@@ -363,6 +364,25 @@ class Detail:
         """Fill a convex polygon with SOLID triangles (fan)."""
         for i in range(1, len(pts) - 1):
             self.solid(pts[0], pts[i], pts[i + 1], None, layer)
+
+    def hatch(self, loops, pattern='ANSI31', scale=1.0, angle=0.0, layer='DTL-HATCH'):
+        """Predefined-pattern hatch (acad.pat names, or 'SOLID'). loops = one boundary
+        (points / (x,y,bulge) verts / Path) or a list of them; the first is the outer
+        boundary, the rest are islands. scale = pattern scale, angle in degrees."""
+        def norm(lp):
+            vs = lp.verts() if isinstance(lp, Path) else lp
+            out = []
+            for v in vs:
+                out.append((float(v[0]), float(v[1]), float(v[2]) if len(v) > 2 else 0.0))
+            if len(out) > 2 and math.hypot(out[0][0] - out[-1][0], out[0][1] - out[-1][1]) < 1e-9:
+                out = out[:-1]
+            if len(out) < 3:
+                raise ValueError('hatch loop needs >= 3 vertices')
+            return out
+        if isinstance(loops, Path) or (loops and isinstance(loops[0][0], (int, float))):
+            loops = [loops]
+        self.recs.append(('HATCH', self._use(layer), str(pattern).upper(), float(scale),
+                          math.radians(angle), [norm(lp) for lp in loops]))
 
     # ---- annotation
     def text(self, s, p, size='note', just='ML', rot=0.0, layer=None, height=None):

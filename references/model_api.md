@@ -20,7 +20,7 @@ Detail(title, command, scale=16.0, text_font='arialbd.ttf',
 
 ### Layers
 Predefined: `DTL-GEOM` (7, 0.35), `DTL-GEOM-THIN` (8, 0.18), `DTL-GEOM-DOT` (8, 0.13, DOT),
-`DTL-GEOM-HIDDEN` (8, 0.18, HIDDEN), `DTL-GEOM-CENTER` (8, 0.13, CENTER), `DTL-TEXT` (2, 0.25),
+`DTL-GEOM-HIDDEN` (8, 0.18, HIDDEN), `DTL-GEOM-CENTER` (8, 0.13, CENTER), `DTL-HATCH` (8, 0.09), `DTL-TEXT` (2, 0.25),
 `DTL-DIM` (4, 0.18). `d.layer(name, color, lw_hundredths_mm, ltype)` adds/overrides one.
 Only layers that receive entities are emitted.
 
@@ -40,6 +40,7 @@ Only layers that receive entities are emitted.
 | `d.bar(center_pts, dia, bend_r, layer)` | closed double-line bar with true-arc bends |
 | `d.solid(p1, p2, p3, p4=None, layer)` | SOLID; give corners in perimeter order |
 | `d.fill_convex(pts, layer)` | convex fill from SOLID triangles |
+| `d.hatch(loops, pattern='ANSI31', scale=1, angle=0, layer='DTL-HATCH')` | HATCH (acad.pat name or `SOLID`), non-associative. `loops` = one boundary or a list (first outer, rest islands); points, `(x,y,bulge)` verts or `Path`. Give each material its own `DTL-HATCH-*` layer |
 
 ### Annotation
 | call | notes |

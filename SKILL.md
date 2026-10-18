@@ -23,10 +23,14 @@ pypdfium2 for PDFs). Run scripts with `python <skill>/scripts/<tool>.py -h` for 
 
 - Draw everything visible in the detail: geometry, text, leaders, symbols, dimensions.
 - Layers by category: `DTL-GEOM*` (geometry; sub-layers allowed: `-DOT`, `-HIDDEN`,
-  `-REBAR`, ...), `DTL-TEXT` (text, leaders, tags, symbols), `DTL-DIM` (dimensions).
+  `-REBAR`, ...), `DTL-HATCH*` (one layer per material hatch: `DTL-HATCH-PLYWOOD`, ...),
+  `DTL-TEXT` (text, leaders, tags, symbols), `DTL-DIM` (dimensions).
   The user renames layers later; separation is what matters.
 - Dotted/dashed lines are single entities on a layer with a real linetype (DOT, HIDDEN...);
   never chains of short segments. Linetype scale is left to the user.
+- Hatched materials are real HATCH entities (predefined acad.pat patterns), one
+  `DTL-HATCH-<MATERIAL>` layer per material. Free-hand textures with no acad.pat
+  equivalent (wood grain) are polylines on their own `DTL-HATCH-*` layer.
 - Arcs with a known/derivable radius are true arcs (polyline bulges, ARC, CIRCLE).
   Approximate with segments only for free-form curves.
 - Units inches; command prefix `UB-`; pure-ASCII file; code and comments in English.
@@ -83,6 +87,7 @@ d = Detail('Title', 'UB-NAME', scale=16)            # scale = annotation scale f
 d.layer('DTL-GEOM-REBAR', 1, 35)                     # optional extra geometry layers
 d.pline(Path(p0).line_to(p1).arc_to(p2, center=c, ccw=False), closed=True)
 d.line(a, b, 'DTL-GEOM-DOT'); d.circle(c, r); d.bar(pts, dia, bend_r); d.dot(c, dia)
+d.hatch([outer, island], 'ANSI31', 2.5, 0, 'DTL-HATCH-PLYWOOD')   # real HATCH, acad.pat
 d.text('PLAN VIEW', p, 'label', 'MC'); d.text_lines([...], p)
 d.leader([arrow_pt, knee, shoulder]); d.leader(pts, spline=True)
 d.dim(p1, p2, dimline_pt, rot=90, oblique=30, override=APPROX, expect='2\'-10 1/2"')

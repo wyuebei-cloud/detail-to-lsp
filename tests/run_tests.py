@@ -56,6 +56,32 @@ for name, lsp, cmd, extra, max_u, max_s in CASES:
     print(f'   coverage outside text zones: unclaimed {u:.2f}% (max {max_u}), spurious {s:.2f}% (max {max_s}) '
           f'-> {"OK" if good else "FAIL"}')
     ok_all &= good
+# ---------------------------------------------------------------- hatch smoke test
+# Neither reference case uses HATCH, so build a tiny detail with an island, a bulge
+# boundary and SOLID fill, and require the gate to pass with every hatch evaluated and
+# its temporary boundaries erased.
+print('== hatch (AddHatch / loops / Evaluate)')
+sys.path.insert(0, S)
+import tempfile, lisp_sim
+from detail_model import Detail
+hd = Detail('hatch smoke', 'UB-HATCHT', scale=4)
+hd.layer('DTL-HATCH-A', 1, 9)
+hd.rect(0, 0, 10, 5)
+hd.hatch([[(0, 0), (10, 0), (10, 5), (0, 5)], [(4, 1), (6, 1, 1.0), (6, 3), (4, 3)]], 'ANSI31', 2, 30, 'DTL-HATCH-A')
+hd.hatch([(11, 0), (13, 0), (13, 2)], 'SOLID')
+with tempfile.TemporaryDirectory() as td:
+    hl = hd.emit(os.path.join(td, 'UB-HATCHT.lsp'))
+    rc, out = run([sys.executable, os.path.join(S, 'check_lsp.py'), hl, '--run', 'C:UB-HATCHT'], td)
+    it = lisp_sim.simulate(hl, 'C:UB-HATCHT')
+types = [r['type'] for r in it.acad.ents]
+hats = [r for r in it.acad.ents if r['type'] == 'HATCH']
+good = (rc == 0 and len(hats) == 2 and types.count('LWPOLYLINE') == 1
+        and [len(h['loops']) for h in hats] == [2, 1] and all(h.get('evaluated') for h in hats))
+print(f'   gate {"PASS" if rc == 0 else "FAIL"}, hatches {len(hats)}, boundaries left {types.count("LWPOLYLINE") - 1}'
+      f' -> {"OK" if good else "FAIL"}')
+if not good: print(out[-2500:])
+ok_all &= good
+
 # ---------------------------------------------------------------- intake CLI smoke test
 # The reference cases above never print source text, so they cannot catch an intake tool
 # that crashes on output. Run every CLI once with the child's stdout forced to cp1252 -

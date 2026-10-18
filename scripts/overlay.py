@@ -187,6 +187,50 @@ def dim_parts(d, dv, style_font):
     texts.append((txt, (mid[0] + nn[0] * off, mid[1] + nn[1] * off), h, ang, 'MC'))
     return polys, fills, texts
 
+# pattern families for the preview: (line angle deg, spacing in pattern units) - acad.pat approximations
+HATCH_PREVIEW = {'ANSI31': [(45, 0.125)], 'ANSI32': [(45, 0.375), (45, 0.375, 0.0625)],
+                 'ANSI33': [(45, 0.25), (45, 0.25, 0.125)], 'ANSI34': [(45, 0.75), (45, 0.75, 0.125)],
+                 'ANSI35': [(45, 0.25), (45, 0.25, 0.125)], 'ANSI36': [(45, 0.125)],
+                 'ANSI37': [(45, 0.125), (135, 0.125)], 'ANSI38': [(45, 0.125), (135, 0.25)],
+                 'STEEL': [(45, 0.125), (45, 0.125, 0.0625)], 'LINE': [(0, 0.125)], 'NET': [(0, 0.125), (90, 0.125)],
+                 'NET3': [(0, 0.125), (60, 0.125), (120, 0.125)], 'DASH': [(0, 0.125)], 'BRASS': [(0, 0.25), (0, 0.25, 0.125)],
+                 'INSUL': [(0, 0.375)], 'EARTH': [(0, 0.25), (90, 0.25)], 'CROSS': [(0, 0.25), (90, 0.25)],
+                 'AR-SAND': [(37.5, 0.12), (7.5, 0.13)], 'AR-CONC': [(50, 0.6), (355, 0.7)]}
+
+def hatch_parts(rec):
+    """Preview of a HATCH: SOLID -> filled outer loop; pattern -> clipped parallel lines (even-odd)."""
+    from detail_model import sample_verts
+    d = items_dict(rec['items'])
+    pat = d.get(2, ['ANSI31'])[0]; scl = d.get(41, [1.0])[0]; ang = d.get(52, [0.0])[0]
+    loops = [sample_verts(lp, True) for lp in rec.get('loops', [])]
+    if not loops:
+        return [], []
+    if pat == 'SOLID':
+        return [], [loops[0]]
+    edges = []
+    for lp in loops:
+        pts = lp if lp[0] == lp[-1] else lp + [lp[0]]
+        edges += list(zip(pts[:-1], pts[1:]))
+    segs = []
+    for fam in HATCH_PREVIEW.get(pat, [(45, 0.125)]):
+        a = math.radians(fam[0]) + ang; sp = fam[1] * scl; off = (fam[2] * scl) if len(fam) > 2 else 0.0
+        ca, sa = math.cos(a), math.sin(a)
+        rot = lambda p: (p[0] * ca + p[1] * sa, -p[0] * sa + p[1] * ca)   # line direction -> +x
+        unrot = lambda u, v: (u * ca - v * sa, u * sa + v * ca)
+        E = [(rot(p), rot(q)) for p, q in edges]
+        vs = [v for e in E for _, v in e]
+        k0 = math.floor((min(vs) - off) / sp); k1 = math.ceil((max(vs) - off) / sp)
+        for k in range(k0, k1 + 1):
+            v = off + k * sp
+            xs = []
+            for (u1, v1), (u2, v2) in E:
+                if (v1 <= v < v2) or (v2 <= v < v1):
+                    xs.append(u1 + (v - v1) * (u2 - u1) / (v2 - v1))
+            xs.sort()
+            for i in range(0, len(xs) - 1, 2):
+                segs.append([unrot(xs[i], v), unrot(xs[i + 1], v)])
+    return segs, []
+
 def entity_parts(rec, tables, A):
     """-> polys, fills, texts (model coords) for one simulated entity."""
     d = items_dict(rec['items'])
@@ -218,6 +262,9 @@ def entity_parts(rec, tables, A):
         polys.append([(c[0] + r * math.cos(a0 + sw * k / 48), c[1] + r * math.sin(a0 + sw * k / 48)) for k in range(49)])
     elif t == 'SOLID':
         fills.append([d[10][0][:2], d[11][0][:2], d[13][0][:2], d[12][0][:2]])
+    elif t == 'HATCH':
+        hp, hf = hatch_parts(rec)
+        polys += hp; fills += hf
     elif t == 'TEXT':
         j = JUST.get((d.get(72, [0])[0], d.get(73, [0])[0]), 'L')
         p = d[10][0] if j == 'L' else d.get(11, d[10])[0]

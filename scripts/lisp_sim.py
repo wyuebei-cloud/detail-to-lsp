@@ -153,6 +153,13 @@ LINETYPE_LIB = {'DOT', 'DOT2', 'DOTX2', 'DASHED', 'DASHED2', 'DASHEDX2', 'HIDDEN
                 'HIDDENX2', 'CENTER', 'CENTER2', 'CENTERX2', 'PHANTOM', 'PHANTOM2', 'DASHDOT',
                 'DASHDOT2', 'BORDER', 'DIVIDE', 'ACAD_ISO02W100', 'ACAD_ISO03W100'}
 
+HATCH_LIB = {'SOLID', 'ANGLE', 'ANSI31', 'ANSI32', 'ANSI33', 'ANSI34', 'ANSI35', 'ANSI36', 'ANSI37',
+             'ANSI38', 'AR-B816', 'AR-B816C', 'AR-B88', 'AR-BRELM', 'AR-BRSTD', 'AR-CONC', 'AR-HBONE',
+             'AR-PARQ1', 'AR-RROOF', 'AR-RSHKE', 'AR-SAND', 'BOX', 'BRASS', 'BRICK', 'BRSTONE', 'CLAY',
+             'CORK', 'CROSS', 'DASH', 'DOLMIT', 'DOTS', 'EARTH', 'ESCHER', 'FLEX', 'GRASS', 'GRATE',
+             'GRAVEL', 'HEX', 'HONEY', 'HOUND', 'INSUL', 'LINE', 'MUDST', 'NET', 'NET3', 'PLAST',
+             'PLASTI', 'SACNCR', 'SQUARE', 'STARS', 'STEEL', 'SWAMP', 'TRANS', 'TRIANG', 'ZIGZAG'}
+
 DIMVARS = {
     'DIMSCALE': 1.0, 'DIMTXT': 0.18, 'DIMASZ': 0.18, 'DIMEXO': 0.0625, 'DIMEXE': 0.18,
     'DIMGAP': 0.09, 'DIMDLE': 0.0, 'DIMTAD': 0, 'DIMJUST': 0, 'DIMTIH': 1, 'DIMTOH': 1,
@@ -804,7 +811,8 @@ class Interp:
         B[Sym('VLA-ADDDIMALIGNED')] = add_ali
         def setprop(code, check=None):
             def f(o, v):
-                if not isinstance(o, VlaObj) or o.kind != 'Dimension': raise LispError('property put on non-dimension (sim)')
+                if not isinstance(o, VlaObj) or o.kind not in ('Dimension', 'Hatch') or (o.kind == 'Hatch' and code != 8):
+                    raise LispError('property put on unsupported object (sim)')
                 if not isinstance(v, str): raise LispError(f'property expects string, got {lrepr(v)}')
                 if check: check(v)
                 rec = A.by_ename[o.ename]
@@ -820,7 +828,92 @@ class Interp:
         B[Sym('VLA-PUT-TEXTOVERRIDE')] = setprop(1)
         B[Sym('VLA-PUT-STYLENAME')] = setprop(3, chk_ds)
         B[Sym('VLAX-VLA-OBJECT->ENAME')] = lambda o: o.ename
-        B[Sym('VLAX-ENAME->VLA-OBJECT')] = lambda e: VlaObj('Dimension', ename=e)
+        def ename2obj(e):
+            rec = A.by_ename.get(e)
+            if rec is None: raise LispError('vlax-ename->vla-object: bad entity name')
+            kind = {'DIMENSION': 'Dimension', 'HATCH': 'Hatch'}.get(rec['type'], 'Entity')
+            return VlaObj(kind, ename=e)
+        B[Sym('VLAX-ENAME->VLA-OBJECT')] = ename2obj
+        # --- hatch support (AddHatch + AppendOuterLoop/AppendInnerLoop + Evaluate)
+        B[Sym('VLAX-VBOBJECT')] = 9
+        B[Sym(':VLAX-FALSE')] = Sym(':VLAX-FALSE'); B[Sym(':VLAX-TRUE')] = Sym(':VLAX-TRUE')
+        def mk_sa(t, *bounds):
+            if t != 9: raise LispError('vlax-make-safearray: only vlax-vbObject supported (sim)')
+            if len(bounds) != 1 or not isinstance(bounds[0], Pair): raise LispError('vlax-make-safearray: bad bounds')
+            n = bounds[0].cdr - bounds[0].car + 1
+            if n < 1: raise LispError('vlax-make-safearray: empty bounds')
+            return VlaObj('SafeArray', n=n, items=None)
+        def sa_fill(sa, lst):
+            if not (isinstance(sa, VlaObj) and sa.kind == 'SafeArray'): raise LispError('vlax-safearray-fill: not a safearray')
+            if not isinstance(lst, list) or len(lst) != sa.n: raise LispError('vlax-safearray-fill: wrong number of elements')
+            for o in lst:
+                if not isinstance(o, VlaObj): raise LispError('vlax-safearray-fill: element is not a VLA object')
+            sa.items = lst; return sa
+        def mk_var(v, *t):
+            return VlaObj('Variant', value=v)
+        B[Sym('VLAX-MAKE-SAFEARRAY')] = mk_sa; B[Sym('VLAX-SAFEARRAY-FILL')] = sa_fill
+        B[Sym('VLAX-MAKE-VARIANT')] = mk_var
+        def add_hatch(o, ptype, name, assoc, *rest):
+            if o is not ms: raise LispError('AddHatch: owner must be ModelSpace')
+            if ptype not in (0, 1, 2): raise LispError('AddHatch: bad pattern type')
+            if not isinstance(name, str): raise LispError('AddHatch: pattern name must be a string')
+            if ptype == 1 and name.upper() not in HATCH_LIB: raise LispError(f'AddHatch: pattern {name} not in acad.pat')
+            if assoc not in (Sym(':VLAX-FALSE'), Sym(':VLAX-TRUE')): raise LispError('AddHatch: associativity must be :vlax-false/:vlax-true')
+            e = EName()
+            items = [(0, 'HATCH'), (8, A.sysvars['CLAYER']), (2, name.upper()), (41, 1.0), (52, 0.0), (91, 0)]
+            rec = {'ename': e, 'type': 'HATCH', 'items': items, 'loops': [], 'evaluated': False}
+            A.ents.append(rec); A.by_ename[e] = rec
+            return VlaObj('Hatch', ename=e)
+        B[Sym('VLA-ADDHATCH')] = add_hatch
+        def hrec(h, fname):
+            if not (isinstance(h, VlaObj) and h.kind == 'Hatch'): raise LispError(f'{fname}: not a hatch object')
+            return A.by_ename[h.ename]
+        def hput(code, fname):
+            def f(h, v):
+                rec = hrec(h, fname)
+                if not isinstance(v, (int, float)) or isinstance(v, bool): raise LispError(f'{fname}: expects a number')
+                if code == 41 and v <= 0: raise LispError(f'{fname}: scale must be > 0')
+                rec['items'] = [(c, x_) for c, x_ in rec['items'] if c != code] + [(code, float(v))]
+                return None
+            return f
+        B[Sym('VLA-PUT-PATTERNSCALE')] = hput(41, 'PatternScale')
+        B[Sym('VLA-PUT-PATTERNANGLE')] = hput(52, 'PatternAngle')
+        def loop_verts(var, fname):
+            if not (isinstance(var, VlaObj) and var.kind == 'Variant'): raise LispError(f'{fname}: expects a variant')
+            sa = var.value
+            if not (isinstance(sa, VlaObj) and sa.kind == 'SafeArray' and sa.items): raise LispError(f'{fname}: expects a filled object safearray')
+            out = []
+            for o in sa.items:
+                rec = A.by_ename.get(getattr(o, 'ename', None))
+                if rec is None: raise LispError(f'{fname}: boundary object was deleted')
+                if rec['type'] != 'LWPOLYLINE': raise LispError(f'{fname}: boundary must be LWPOLYLINE in this runtime')
+                d = {}
+                for c, v in rec['items']: d.setdefault(c, []).append(v)
+                if not (d.get(70, [0])[0] & 1): raise LispError(f'{fname}: boundary polyline is not closed')
+                bs = d.get(42, [0.0] * len(d[10]))
+                out.append([(v[0], v[1], b) for v, b in zip(d[10], bs)])
+            return out
+        def app_outer(h, var):
+            rec = hrec(h, 'AppendOuterLoop')
+            if rec['loops']: raise LispError('AppendOuterLoop: outer loop already appended')
+            rec['loops'] += loop_verts(var, 'AppendOuterLoop'); return None
+        def app_inner(h, var):
+            rec = hrec(h, 'AppendInnerLoop')
+            if not rec['loops']: raise LispError('AppendInnerLoop: append the outer loop first')
+            rec['loops'] += loop_verts(var, 'AppendInnerLoop'); return None
+        B[Sym('VLA-APPENDOUTERLOOP')] = app_outer; B[Sym('VLA-APPENDINNERLOOP')] = app_inner
+        def evaluate(h):
+            rec = hrec(h, 'Evaluate')
+            if not rec['loops']: raise LispError('Evaluate: hatch has no boundary')
+            rec['evaluated'] = True
+            rec['items'] = [(c, x_) for c, x_ in rec['items'] if c != 91] + [(91, len(rec['loops']))]
+            return None
+        B[Sym('VLA-EVALUATE')] = evaluate
+        def vla_delete(o):
+            rec = A.by_ename.pop(getattr(o, 'ename', None), None)
+            if rec is None: raise LispError('vla-Delete: object already erased')
+            A.ents.remove(rec); return None
+        B[Sym('VLA-DELETE')] = vla_delete
 
     # -- load / run
     def load(self, src):
@@ -834,7 +927,11 @@ class Interp:
         f = self.lookup(Sym(cmd))
         if f is None: raise LispError(f"command {cmd} not defined")
         try:
-            return self.call(f, [])
+            r = self.call(f, [])
+            for rec in self.acad.ents:
+                if rec['type'] == 'HATCH' and not rec.get('evaluated'):
+                    self.acad.errors.append('HATCH created but never evaluated (no boundary)')
+            return r
         except LispError as e:
             handler = self.lookup(Sym('*ERROR*'))
             self.acad.errors.append(f'runtime error: {e}')

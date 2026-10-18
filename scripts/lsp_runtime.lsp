@@ -1,5 +1,5 @@
 ;;; ---------------------------------------------------------------------------
-;;; detail-to-lsp runtime  (version 1.0)
+;;; detail-to-lsp runtime  (version 1.1 - adds HATCH)
 ;;; Data-driven drawing engine. Each generated detail supplies a quoted record
 ;;; list; this runtime turns records into entities. The runtime is identical in
 ;;; every generated file, so it is verified once (lisp_sim.py) and reused.
@@ -18,6 +18,10 @@
 ;;;               kind "ROT" (rotated/linear) or "ALI" (aligned); override and
 ;;;               oblique may be nil
 ;;;   ("SOLID"    layer (x y) (x y) (x y) (x y))
+;;;   ("HATCH"    layer pattern scale angle (loop ...))
+;;;               loop = ((x y bulge) ...), first loop outer, others islands;
+;;;               predefined pattern from acad.pat, angle in radians,
+;;;               non-associative (temporary boundaries are deleted)
 ;;; ---------------------------------------------------------------------------
 
 (vl-load-com)
@@ -223,6 +227,42 @@
   )
 )
 
+;;; Non-associative predefined-pattern hatch through ActiveX. Boundaries are
+;;; temporary closed polylines on the hatch layer, removed after Evaluate.
+(defun dtl:hatch-arr (o)
+  (vlax-make-variant
+    (vlax-safearray-fill (vlax-make-safearray vlax-vbObject '(0 . 0)) (list o)))
+)
+
+(defun dtl:hatch-make (lay pat scl ang objs / h)
+  (setq h (vla-AddHatch *dtl-ms* 1 pat :vlax-false))
+  (vla-put-Layer h lay)
+  (if (/= (strcase pat) "SOLID")
+    (progn (vla-put-PatternScale h scl) (vla-put-PatternAngle h ang))
+  )
+  (vla-AppendOuterLoop h (dtl:hatch-arr (car objs)))
+  (foreach o (cdr objs) (vla-AppendInnerLoop h (dtl:hatch-arr o)))
+  (vla-Evaluate h)
+  h
+)
+
+(defun dtl:hatch (lay pat scl ang loops / objs r)
+  (setq objs
+    (mapcar '(lambda (lp) (if (dtl:pl lay 1 lp nil) (vlax-ename->vla-object (entlast))))
+            loops))
+  (if (member nil objs)
+    (setq r nil)
+    (setq r (vl-catch-all-apply 'dtl:hatch-make (list lay pat scl ang objs)))
+  )
+  (foreach o objs (if o (vl-catch-all-apply 'vla-Delete (list o))))
+  (cond
+    ((null r) (dtl:warn (strcat "HATCH " pat ": boundary failed")) nil)
+    ((vl-catch-all-error-p r)
+      (dtl:warn (strcat "HATCH " pat " failed: " (vl-catch-all-error-message r))) nil)
+    (T r)
+  )
+)
+
 ;;; ---------- dispatcher ----------
 (defun dtl:do (r / k)
   (setq k (car r))
@@ -239,6 +279,7 @@
     ((= k "DIM")      (dtl:dim (nth 1 r) (nth 2 r) (nth 3 r) (nth 4 r) (nth 5 r) (nth 6 r)
                                (nth 7 r) (nth 8 r) (nth 9 r)))
     ((= k "SOLID")    (dtl:solid (nth 1 r) (nth 2 r) (nth 3 r) (nth 4 r) (nth 5 r)))
+    ((= k "HATCH")    (dtl:hatch (nth 1 r) (nth 2 r) (nth 3 r) (nth 4 r) (nth 5 r)))
     (T (dtl:warn (strcat "Unknown record type " k)) nil)
   )
 )
